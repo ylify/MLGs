@@ -21,8 +21,8 @@ Generally, it is used to look into the chromosomal evolution in organisms. With 
 If you adopt the database in research, please cite the below work. Thanks!  
 
 # Reference:  
-> Buchfink, B., Reuter, K., & Drost, H.-G. (2021). Sensitive protein alignments at tree-of-life scale using DIAMOND. Nature Methods, 18(4), 366-368. doi:10.1038/s41592-021-01101-x
-> Muffato, M., Louis, A., Nguyen, N. T. T., Lucas, J., Berthelot, C., & Roest Crollius, H. (2023). Reconstruction of hundreds of reference ancestral genomes across the eukaryotic kingdom. Nature Ecology & Evolution, 7(3), 355-366. doi:10.1038/s41559-022-01956-z
-> Sami El, H., & Richard, R. C. (2023). macrosyntR : Drawing automatically ordered Oxford Grids from standard genomic files in R. bioRxiv, 2023.2001.2026.525673. doi:10.1101/2023.01.26.525673
-> Simakov, O., Bredeson, J., Berkoff, K., Marletaz, F., Mitros, T., Schultz, D. T., . . . Rokhsar, D. S. (2022). Deeply conserved synteny and the evolution of metazoan chromosomes. Science Advances, 8(5), eabi5884. doi:doi:10.1126/sciadv.abi5884
-> Tang, H., Bowers, J. E., Wang, X., Ming, R., Alam, M., & Paterson, A. H. (2008). Synteny and Collinearity in Plant Genomes. Science, 320(5875), 486-488. doi:doi:10.1126/science.1153917
+> **Buchfink**, B., Reuter, K., & Drost, H.-G. (2021). Sensitive protein alignments at tree-of-life scale using DIAMOND. Nature Methods, 18(4), 366-368. doi:10.1038/s41592-021-01101-x  
+> **Muffato**, M., Louis, A., Nguyen, N. T. T., Lucas, J., Berthelot, C., & Roest Crollius, H. (2023). Reconstruction of hundreds of reference ancestral genomes across the eukaryotic kingdom. Nature Ecology & Evolution, 7(3), 355-366. doi:10.1038/s41559-022-01956-z  
+> **Sami El**, H., & Richard, R. C. (2023). macrosyntR : Drawing automatically ordered Oxford Grids from standard genomic files in R. bioRxiv, 2023.2001.2026.525673. doi:10.1101/2023.01.26.525673  
+> **Simakov**, O., Bredeson, J., Berkoff, K., Marletaz, F., Mitros, T., Schultz, D. T., . . . Rokhsar, D. S. (2022). Deeply conserved synteny and the evolution of metazoan chromosomes. Science Advances, 8(5), eabi5884. doi:doi:10.1126/sciadv.abi5884  
+> **Tang**, H., Bowers, J. E., Wang, X., Ming, R., Alam, M., & Paterson, A. H. (2008). Synteny and Collinearity in Plant Genomes. Science, 320(5875), 486-488. doi:doi:10.1126/science.1153917  
