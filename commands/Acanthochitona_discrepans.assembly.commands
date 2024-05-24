@@ -1,0 +1,137 @@
+Acanthochitona_discrepans genome assembly and annotation
+#Author: Zeyuan Chen, Senckenberg Research Institute and Museum, Frankfurt, Germany
+
+01 Reads process
+#HiFi reads extraction from bam
+module load pbccs/6.4.0
+ccs Acanthochitona_discrepans.subreads.bam Acanthochitona_discrepans.01.bam --chunk 100/1000 -j 16 --all --log-level INFO --log-file out.log --report-file out.report.txt
+module load actc/0.3.1 
+actc -j 16 Acanthochitona_discrepans.subreads.bam Acanthochitona_discrepans.01.bam Acanthochitona_discrepans.subreads_to_ccs.01.bam 
+module load samtools/1.15
+samtools faidx Acanthochitona_discrepans.subreads_to_ccs.01.fasta
+module load deepconsensus/1.2.0
+deepconsensus run --checkpoint=deepconsensus-1.2.0_venv/dc_model_1.2/checkpoint --ccs_bam=Acanthochitona_discrepans.01.bam --subreads_to_ccs=Acanthochitona_discrepans.subreads_to_ccs.01.bam --output=Acanthochitona_discrepans.deepconsensus-1.2.0.01.fastq --cpus 16
+
+#HiC reads control
+module load fastqc/0.11.8
+fastqc Acanthochitona_discrepans_Omni_1.fq.gz  Acanthochitona_discrepans_Omni_2.fq.gz
+
+02 #jellyfish and genomescope2 for genome survey
+module load jellyfish/2.3.0
+jellyfish count -m 21 -s 100M -t 10 -C Acanthochitona_discrepans.hifi.fa -o reads.jf && jellyfish histo -t 10 reads.jf > reads.histo
+module load genomescope/2.0.0
+genomescope2 -i reads.histo -p 2 -o Acanthochitona_discrepans_21_mer.genomescope2 -k 21
+
+03 #genome assembly
+#assemble
+module load hifiasm/0.16.1
+hifiasm -o Acanthochitona_discrepans.hifi.asm.hic -t 96 --h1 adis_HiC.1.filter.fq.gz --h2 adis_HiC.2.filter.fq.gz Acanthochitona_discrepans.hifi.fq.gz
+
+#polish
+module load minimap2/2.24 samtools/1.15.1 picard/2.27.1 deepvariant/1.2 bcftools/1.13 htslib/1.13
+minimap2 -a -t 86 -x map-hifi Acanthochitona_discrepans.hifi.asm.hic.p_ctg.fa Acanthochitona_discrepans.hifi.fq.gz | samtools sort -l 9 -O BAM -@ 10 -o Acanthochitona_discrepans.sort.bam
+picard MarkDuplicates -I Acanthochitona_discrepans.sort.bam -M Acanthochitona_discrepans.sort.bam.metrics -O Acanthochitona_discrepans.sort.markdup.bam --REMOVE_DUPLICATES
+samtools faidx Acanthochitona_discrepans.hifi.asm.hic.p_ctg.fa 
+samtools index Acanthochitona_discrepans.sort.markdup.bam
+deepvariant --model_type=PACBIO --ref=Acanthochitona_discrepans.hifi.asm.hic.p_ctg.fa --reads=Acanthochitona_discrepans.sort.markdup.bam --output_vcf=Acanthochitona_discrepans.sort.markdup.dv.vcf --num_shards=96
+bcftools view -f 'PASS' -i 'GT="1/1"' Acanthochitona_discrepans.sort.markdup.dv.vcf | bcftools view --no-version -Oz > Acanthochitona_discrepans.sort.markdup.dv.hom.vcf.gz
+tabix Acanthochitona_discrepans.sort.markdup.dv.hom.vcf.gz
+bcftools consensus -f Acanthochitona_discrepans.hifi.asm.hic.p_ctg.fa -o Acanthochitona_discrepans.polished.fa Acanthochitona_discrepans.sort.markdup.dv.hom.vcf.gz
+
+#purge dup
+module load purge_dups/1.2.6
+minimap2 -t 96 -x map-hifi Acanthochitona_discrepans.polished.fa Acanthochitona_discrepans.hifi.fq.gz | gzip -c - > Acanthochitona_discrepans.paf.gz
+pbcstat Acanthochitona_discrepans.paf.gz
+calcuts PB.stat > cutoffs 2>calcults.log
+split_fa Acanthochitona_discrepans.polished.fa > Acanthochitona_discrepans.split
+minimap2 -t 96 -x asm5 -DP Acanthochitona_discrepans.split Acanthochitona_discrepans.split | gzip -c - > Acanthochitona_discrepans.split.self.paf.gz
+purge_dups -2 -T cutoffs -c PB.base.cov Acanthochitona_discrepans.split.self.paf.gz > dups.bed 2> purge_dups.log
+get_seqs -e dups.bed Acanthochitona_discrepans.polished.fa 
+
+#purge hap
+module load purge_haplotigs
+minimap2 -t 96 -x map-hifi purged.fa Acanthochitona_discrepans.hifi.fq.gz --secondary=no | samtools sort -m 1G -o aligned.bam -T tmp
+purge_haplotigs contigcov -i Adi.backmap.hifi.sort.bam.gencov  -l 1 -m 16 -h 100
+purge_haplotigs purge -g purged.fa -c coverage_stats.csv
+
+#HiC scaffolding
+samtools faidx curated.fasta
+bwa index curated.fasta
+bwa mem -t 24 -B 8 curated.fasta Acanthochitona_discrepans_Omni_1.fq.gz | filter_five_end.pl | samtools view -b - > adi.hic2_1.flt.bam
+bwa mem -t 24 -B 8 curated.fasta Acanthochitona_discrepans_Omni_2.fq.gz | filter_five_end.pl | samtools view -b - > adi.hic2_2.flt.bam
+two_read_bam_combiner.pl adi.hic2_1.flt.bam adi.hic2_2.flt.bam samtools 10 | samtools view -b - > adi.hic2.bam && rm adi.hic2_1.flt.bam adi.hic2_2.flt.bam
+samtools sort -@ 24 -T adi.hic2.tmp -m2G -O BAM -o adi.hic2.sort.bam adi.hic2.bam && rm adi.hic2.bam
+samtools index adi.hic2.sort.bam
+java -jar -Xmx236g -Djava.io.tmpdir=tmp picard.jar MarkDuplicates REMOVE_DUPLICATES=true I=adi.hic2.sort.bam O=adi.hic2.sort.rmdup.bam M=adi.hic2.sort.rmdup.metrics.txt ASSUME_SORT_ORDER=coordinate MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1024 
+samtools sort -@ 23 -n -T adi.hic2.sort.rmdup.tmp -m2G -O BAM adi.hic2.sort.rmdup.bam > adi.hic2.sort.rmdup.sort-name.bam && rm adi.hic2.sort.rmdup.bam
+yahs -o adi.hic2.yahs curated.fasta adi.hic2.sort.rmdup.sort-name.bam
+juicer pre -a -o adi.hic2.yahs adi.hic2.yahs.bin adi.hic2.yahs_scaffolds_final.agp curated.fasta.fai
+samtools faidx adi.hic2.yahs_scaffolds_final.fa
+juicer pre -a -o adi.hic2.yahs adi.hic2.yahs.bin adi.hic2.yahs_scaffolds_final.agp curated.fasta.fai > adi.hic2.juicer_pre_JBAT.log 2>&1
+java -jar -Xmx200G juicer_tools_1.22.01.jar pre --threads 24 adi.hic2.yahs.txt adi.hic2.yahs.hic.part adi.hic2.yahs.chrom.sizes && mv adi.hic2.yahs.hic.part adi.hic2.yahs.hic
+
+04 Repeat mask
+module load trf/4.10.0
+trf Acanthochitona_discrepans.chr.fa 2 5 7 80 10 50 2000 -f -d -h -m
+module load repeatmodeler/2.0.4
+BuildDatabase -name Acanthochitona_discrepans Acanthochitona_discrepans.chr.fa 
+RepeatModeler -database Acanthochitona_discrepans -threads 10 -LTRStruct
+RepeatClassifier -consensi consensi.fa
+module load repeatmasker/4.0.9
+queryRepeatDatabase.pl -species "all" > repeatmasker.alltaxon.fa
+cat repeatmasker.alltaxon.fa consensi.fa.classified > Acanthochitona_discrepans.repeat.lib.fa
+module load repeatmasker/4.1.2
+RepeatMasker -lib Acanthochitona_discrepans.repeat.lib.fa-gff -no_is -norna -xsmall -pa 48 Acanthochitona_discrepans.chr.fa 
+
+05 Gene annotation
+
+#RNA-seq control
+trimmomatic PE -phred33 adi.rna.1.fq.gz adi.rna.2.fq.gz output_forward_paired.fgz output_forward_unpaired.fq.gz output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+
+#Transcript assembly de novo
+module load trinity/2.11.0
+Trinity --seqType fq --max_memory 50G --left output_forward_paired.fq.gz --right output_reverse_paired.fq.gz --CPU 10
+
+#Transcript assembly genome-guided
+module load star
+STAR --runThreadN 20 --runMode genomeGenerate --genomeDir STAR --genomeFastaFiles Acanthochitona_discrepans.chr.fa.masked
+STAR --genomeDir STAR --runThreadN 20 --readFilesIn adi.rna.1.filter.fq.gz,adi.rna.2.filter.fq.gz --readFilesCommand zcat --outFileNamePrefix adi --outSAMtype BAM SortedByCoordinate --outBAMsortingThreadN 20 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical
+module load trinity
+Trinity --genome_guided_bam adiAligned.sortedByCoord.out.bam --genome_guided_max_intron 10000 --CPU 20 --max_memory 300G
+
+#transcriptom prediction
+cat Trinity.fasta Trinity-GG.fasta > transcripts.fasta                                               
+module load pasa
+seqclean transcripts.fasta
+Launch_PASA_pipeline.pl -c conf.txt -C -R -g Acanthochitona_crinita.fa.masked -t transcripts.fasta.clean -T -u transcripts.fasta --ALIGNERS blat,gmap --CPU 30
+
+#homolog predction
+protein files of Acanthopleura granulata and Hanleya hanleyi were downloaded from NCBI
+module load mmseqs2 gemoma;
+mmseqs createdb Acanthochitona_discrepans.chr.fa.masked output/mmseqsdb -v 2
+mmseqs createdb Acanthopleura_granulata.pep.fasta output/Acanthopleura_granulata/mmseqsdb -v 2;mmseqs search output/Acanthopleura_granulata/mmseqsdb output/mmseqsdb output/Acanthopleura_granulata/mmseqsdb_align.out output/Acanthopleura_granulata/mmseqsdb_tmp -e 100.0 --threads 30 -s 8.5 -a --comp-bias-corr 0 --max-seqs 500 --mask 0 --orf-start-mode 1 -v 2;
+mmseqs convertalis output/Acanthopleura_granulata/mmseqsdb output/mmseqsdb output/Acanthopleura_granulata/mmseqsdb_align.out output/Acanthopleura_granulata.search.txt --threads 30 --format-output "query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,empty,raw,nident,empty,empty,empty,qframe,tframe,qaln,taln,qlen,tlen" -v 2
+java -jar GeMoMa-1.8.jar CLI ERE c=true s=FR_UNSTRANDED m=adiAligned.sortedByCoord.out.bam outdir=output
+java -jar GeMoMa-1.9.jar CLI GeMoMa s=output/Acanthopleura_granulata.search.txt c=Acanthopleura_granulata.pep.fasta t=Acanthochitona_discrepans.chr.fa.masked sort=true Score="ReAlign" outdir=output/Acanthopleura_granulata.predict i=output/introns.gff coverage=UNSTRANDED coverage_unstranded=output/coverage.bedgraph
+java -jar GeMoMa-1.9.jar CLI GAF g=output/Acanthopleura_granulata.predict/predicted_annotation.gff p=acanthopleura_granulata outdir=output/Acanthopleura_granulata.predict
+
+#de novo prediciton
+singularity exec /cluster/home/zchen/apps/braker3.sif braker.pl --threads 40 --AUGUSTUS_SCRIPTS_PATH=/cluster/software/augustus/augustus-3.4.0/scripts --AUGUSTUS_CONFIG_PATH=/cluster/home/zchen/augustus_config --species=Acanthochitona_crinita_braker3 --genome=t=Acanthochitona_discrepans.chr.fa.masked --softmasking --bam=adiAligned.sortedByCoord.out.bam --gff3
+
+#Integration
+evidence_modeler.pl --genome Acanthochitona_discrepans.chr.fa.masked --weights weights.txt --transcript_alignments Acanthochitona_discrepans.pasa.gff >Acanthochitona_discrepans.gene.evm.predict
+```
+weights.txt
+PROTEIN Acanthopleura_granulata 2
+PROTEIN Hanleya_hanleyi         1
+TRANSCRIPT      assembler-pasa_adi1     8
+ABINITIO_PREDICTION     Augustus        1
+```
+
+#Filtering
+/beegfs/home/zchen/bin/gFACs-master/gFACs.pl -f EVM_1.1.1_gff3 -p FULL_TEST --statistics --statistics-at-every-step --rem-5prime-3prime-incompletes --rem-all-incompletes --fasta Acanthochitona_discrepans.chr.fa.masked --splice-table --canonical-only --rem-genes-without-start-codon --allow-alternate-starts --rem-genes-without-stop-codon --rem-genes-without-start-and-stop-codon --allowed-inframe-stop-codons 0 --nt-content --get-fasta-with-introns --get-fasta-without-introns --get-protein-fasta --create-gtf --create-simple-gtf --create-gff3 --distributions exon_lengths 10 intron_lengths 15 CDS_lengths 20 gene_lengths 100 exon_position exon_position_data intron_position intron_position_data --compatibility SnpEff EVM_1.1.1_gene_prediction EVM_1.1.1_alignment -O gFACs.filter.out adi.only.denovo.gff
+
+#BUSCO assessment
+module load busco/5.4.3
+busco -m protein -i final.geneset.pep -o Acanthochitona_discrepans.pep.busco -l /beegfs/software/busco/datasets/odb10_2021_09_02/metazoa_odb10
+busco -m geno -i Acanthochitona_discrepans.genome.fa -c 8 -l /beegfs/software/busco/datasets/odb10_2021_09_02/metazoa_odb10 -o Acanthochitona_discrepans.genome.busco --offline
