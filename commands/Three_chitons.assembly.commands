@@ -1,0 +1,116 @@
+Genome assembly and gene model predicion in three chitons (Acanthochitona rubrolineata, Callochiton septemvalvis, and Deshayessiella sirenkoi)
+Author: Yunlong Li, Ocean University of China, Qingdao, China
+Email: liyunlong@ouc.edu.cn or ylify@connect.ust.hk
+
+For Callochiton septemvalvis genome assembly, as the example
+
+01 #reads extraction from bam
+extracthifi -j 40 input.bam output.bam 
+
+02 #HiFiAdapterFilt (run in folder with fastq)
+~/Software/HiFiAdapterFilt/hifiadapterfilt.sh 
+
+03 #jellyfish and genomescope2 for genome survey
+jellyfish count -s 5G -t 20 -C -m 21 -o Callochiton_21_mer Callochiton.HiFi_reads.filt.fastq
+jellyfish histo -f Callochiton_21_mer > Callochiton_21_mer.histo
+genomescope2 -i Callochiton_21_mer.histo -p 2 -o Callochiton_21_mer.genomescope2 -k 21
+
+04 #hifiasm assembly
+hifiasm -t 40 -l0 -o Callochiton Callochiton.HiFi_reads.filt.fastq 
+#For Acanthochitona rubrolineata and Deshayesiella sirenko
+hifiasm -t 40 -o Acanthochitona_rubrolineata Acanthochitona_rubrolineata.HiFi_reads.filt.fastq 
+
+05 #khaper phasing (only for Callochiton, duplicated haplotigs in other species were removed using purge_dups as the below shown)
+perl ~/Software/khaper/Bin/Graph.pl pipe -i fq.list -m 2 -k 17 -s 1,3,5 -d Kmer_17
+perl ~/Software/khaper/Bin/remDup.pl --kbit Kmer_17/02.Uinque_bit/kmer_17.bit --kmer 17 ~/Project/Callochiton/Data/HiC_reads/Callochiton.bp.p_ctg.fa Compress_0.2 0.2
+##followed by manual check, and only hap1 was used in the following analysis
+0501 #purge_dups
+minimap2 -t 40 -x map-hifi Acanthochitona_rubrolineata.bp.p_ctg.fa Acanthochitona_rubrolineata.HiFi_reads.filt.fastq -o Acanthochitona_rubrolineata.bp.p_ctg.fa.HiFi.paf
+gzip Acanthochitona_rubrolineata.bp.p_ctg.fa.HiFi.paf
+pbcstat Acanthochitona_rubrolineata.bp.p_ctg.fa.HiFi.paf
+calcuts PB.stat > cutoffs 2>calcults.log
+split_fa Acanthochitona_rubrolineata.bp.p_ctg.fa > Acanthochitona_rubrolineata.bp.p_ctg.fa.split
+minimap2 -xasm5 -t 40 -DP Acanthochitona_rubrolineata.bp.p_ctg.fa.split Acanthochitona_rubrolineata.bp.p_ctg.fa.split -o Acanthochitona_rubrolineata.bp.p_ctg.fa.split.self.paf
+gzip Acanthochitona_rubrolineata.bp.p_ctg.fa.split.self.paf
+purge_dups -2 -T cutoffs -c PB.base.cov Acanthochitona_rubrolineata.bp.p_ctg.fa.split.self.paf.gz > dups.bed 2> purge_dups.log
+get_seqs -e dups.bed Acanthochitona_rubrolineata.bp.p_ctg.fa
+
+06 #RepeatModeler (version 2.0.3)
+time BuildDatabase -engine rmblast -name Callochiton_hifiasm_khaper_0.2.Hap1 ../Callochiton_hifiasm_khaper_0.2.Hap1.fasta
+time RepeatModeler -database Callochiton_hifiasm_khaper_0.2.Hap1 -pa 5
+
+07 #RepeatMasker (version 4.1.2-p1)
+RepeatMasker -xsmall -e rmblast -lib ../RepeatModeler/Callochiton_hifiasm_khaper_0.2.Hap1-families.fa -pa 8 -div 30  ../Callochiton_hifiasm_khaper_0.2.Hap1.fasta
+
+08 #RNA-seq trimming
+trimmomatic PE -threads 20 -phred33 ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_1.fq ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_2.fq ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_paired_1.fq ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_unpaired_1.fq ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_paired_2.fq ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_unpaired_2.fq  ILLUMINACLIP:/home/yunlongli/mambaforge/share/trimmomatic-0.39-2/adapters/TruSeq3-PE-2.fa:2:30:10:8:true SLIDINGWINDOW:5:20 LEADING:3 TRAILING:3 MINLEN:36
+
+09 #Braker2
+STAR --runThreadN 15 --runMode genomeGenerate --genomeDir Callochiton_hifiasm_khaper_0.2.Hap1 --genomeFastaFiles ../../Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked
+STAR --genomeDir  Callochiton_hifiasm_khaper_0.2.Hap1 --runThreadN 15 --readFilesIn ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_paired_1.fq ~/Project/Callochiton/Data/RNA-seq/illumina/C4_1_A_paired_2.fq --outFileNamePrefix C4_1_A_ --outSAMtype BAM SortedByCoordinate --outBAMsortingThreadN 15 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical #the other RNA-seq fastq were omitted
+samtools index *.bam
+samtools merge -@20 Callochiton_hifiasm_khaper_0.2.Hap1.genome_guided.bam *.bam
+samtools index Callochiton_hifiasm_khaper_0.2.Hap1.genome_guided.bam
+stringtie -p 20 -o Callochiton_hifiasm_khaper_0.2.Hap1.genome_guided.stringtie.gtf Callochiton_hifiasm_khaper_0.2.Hap1.genome_guided.bam
+braker.pl --cores 16 --softmasking --species=Callochiton --genome=Callochiton_hifiasm_khaper_0.2.Hap1.fasta --gff3 --bam=Callochiton_hifiasm_khaper_0.2.Hap1.genome_guided.bam
+genemark_gtf2gff3 ./braker/GeneMark-ET/genemark.gtf > ./braker/GeneMark-ET/genemark.gff3
+
+10 #miniprot alignment
+miniprot -t 40 --gff Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked Genome_animal.pep.fasta > Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked.against.Genome_animal.pep.fasta.gff
+python3 miniprot_GFF_2_EVM_alignment_GFF3.py (this script is available at EVM github) Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked.against.Genome_animal.pep.fasta.gff > Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked.against.Genome_animal.pep.fasta.gff3
+
+11 #Transcript assembly de novo
+Trinity --samplei_file Callochiton.RNA-seq.txt --max_memory 50G --genome_guided_max_intron 20000 --CPU 6 --full_cleanup
+
+12 #Transcript assembly genome-guided
+Trinity --genome_guided_bam Callochiton_hifiasm_khaper_0.2.Hap1.RNA_seq.merged.bam --max_memory 50G --genome_guided_max_intron 20000 --CPU 6 --full_cleanup
+
+13 #PASA for transcript alignment
+cat ../RNA-seq/devovo/trinity_out_dir.Trinity.fasta ../RNA-seq/genome-guided/trinity_out_dir.Trinity-GG.fasta > Callochiton.RNA-seq.fasta
+cd-hit-est -c 0.97 -T 40 -M 50000M -i Callochiton.RNA-seq.fasta -o Callochiton.RNA-seq.cd_hit_0.97.fasta 
+seqclean Callochiton.RNA-seq.cd_hit_0.97.fasta -c 10 -v ~/Database/Univec_database/ 
+accession_extractor.pl < Callochiton.RNA-seq.cd_hit_0.97.fasta > tdn.accs
+Launch_PASA_pipeline.pl -c alignAssembly.config -C -R --TDN tdn.accs --ALIGNERS blat,minimap2 --CPU 40  --stringent_alignment_overlap 30.0 -g Callochiton_hifiasm_khaper_0.2.Hap1.masked -tCallochiton.RNA-seq.cd_hit_0.97.fasta.clean -T -u Callochiton.RNA-seq.cd_hit_0.97.fasta
+
+##alignAssembly.config
+'''
+## templated variables to be replaced exist as <__var_name__>
+ 
+# database settings
+DATABASE=$WD/pasa/Callochiton_hifiasm_khaper_0.2.Hap1.masked.pasa.sqlite
+ 
+#######################################################
+# Parameters to specify to specific scripts in pipeline
+# create a key = "script_name" + ":" + "parameter" 
+# assign a value as done above.
+ 
+#script validate_alignments_in_db.dbi
+validate_alignments_in_db.dbi:--MIN_PERCENT_ALIGNED=80
+validate_alignments_in_db.dbi:--MIN_AVG_PER_ID=80
+ 
+#script subcluster_builder.dbi
+subcluster_builder.dbi:-m=50
+'''
+
+#14 EVM
+partition_EVM_inputs.pl --segmentSize 100000 --overlapSize 10000 --partition_listing partitions_list.out --genome  --gene_predictions gene_predictions.gff3 --protein_alignments protein_gff3 --transcript_alignments transcripts.gff3
+write_EVM_commands.pl --output_file_name evm.out --partitions partitions_list.out --genome  Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked --gene_predictions gene_predictions.gff3 --protein_alignments protein_gff3 --transcript_alignments transcripts.gff3 --weights $WD/EVM/weights.txt > commands.list
+parallel -j 40 < commands.list
+recombine_EVM_partial_outputs.pl --partitions partitions_list.out --output_file_name evm.out
+convert_EVM_outputs_to_GFF3.pl  --partitions partitions_list.out --output evm.out --genome Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked
+find . -regex ".*evm.out.gff3" -exec cat {} \; > Callochiton.evm.gff3
+gff3_file_to_proteins.pl --gff3 Callochiton.evm.gff3 --genome Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked
+##Remark: manual check in Callochiton.evm.gff3, excluding low support genes (i.e., only ABINITIO_PREDICTION presented in gene model), which resulted in a file named Callochiton.evm.filtered.gff3)
+##Callochiton_septemvalvis: 
+
+#15 PASA update
+Load_Current_Gene_Annotations.dbi -c alignAssembly.config -g Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked -P Callochiton.evm.filtered.gff3
+/Launch_PASA_pipeline.pl -c annotationCompare.config --CPU 40 -A -g Callochiton_hifiasm_khaper_0.2.Hap1.fasta.masked -t Callochiton.RNA-seq.cd_hit_0.97.fasta.clean --annots Callochiton.evm.filtered.gff3
+#The resulted gff3 was renamed Callochiton_septemvalvis.chr.gff3, with Callochiton_septemvalvis.chr.pep.fasta (protein sequences)
+
+#16 diamond blastp against the nr database
+diamond blastp --db Nr_20220126.diamond_db.dmnd -q Callochiton_septemvalvis.chr.pep.fasta -f 5 -p 80 --very-sensitive -o Callochiton_septemvalvis.chr.pep.fasta.against.diamond_nr.m5 --max-hsps 20 --evalue 1e-5
+
+#17 BUSCO assessment
+busco -i Callochiton_septemvalvis.chr.pep.fasta -o Callochiton_septemvalvis.chr.pep.fasta.busco -m prot -l ~/busco_downloads/lineages/metazoa_odb10/ -c 40 --offline 
+busco -i Callochiton_septemvalvis.chr.genomic.fasta -o Callochiton_septemvalvis.chr.genomic.fasta.busco -m genome -l ~/busco_downloads/lineages/metazoa_odb10/ -c 40 --offline 
