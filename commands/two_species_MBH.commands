@@ -1,0 +1,46 @@
+#examples between Acanthochitona_rubrolineata and Acanthochitona_discrepans
+
+diamond makedb --threads 16 --in Acanthochitona_rubrolineata.pep -d Acanthochitona_rubrolineata.diamond_db
+diamond makedb --threads 16 --in Acanthochitona_discrepans.pep -d Acanthochitona_discrepans.diamond_db
+diamond blastp -p 40 -d Acanthochitona_discrepans.diamond_db -c 1 --outfmt 6 qseqid sseqid pident length qlen mismatch gapopen qstart qend evalue bitscore  --max-target-seqs 50000 --quiet --more-sensitive -e 0.001 -q Acanthochitona_rubrolineata.pep -o Acanthochitona_rubrolineata.against.Acanthochitona_discrepans.diamond_blastp.m6.out
+diamond blastp -p 40 -d Acanthochitona_rubrolineata.diamond_db -c 1 --outfmt 6 qseqid sseqid pident length qlen mismatch gapopen qstart qend evalue bitscore  --max-target-seqs 50000 --quiet --more-sensitive -e 0.001 -q Acanthochitona_discrepans.pep -o Acanthochitona_discrepans.against.Acanthochitona_rubrolineata.diamond_blastp.m6.out
+
+#python script
+with open('Acanthochitona_rubrolineata.Acanthochitona_discrepans.MBH.diamond.m6.out','w') as out:
+    sp1_sp2_diamond = {}
+    with open('Acanthochitona_rubrolineata.against.Acanthochitona_discrepans.diamond_blastp.m6.out') as file:
+    for line in file:
+        line = line.strip('\n')
+        n = line.strip('\n').split('\t')
+        if n[0] not in sp1_sp2_diamond.keys():
+            sp1_sp2_diamond[n[0]] = line.strip('\n')
+        else:
+            if float(n[-1]) > float(sp1_sp2_diamond[n[0]].split('\t')[-1]):
+                sp1_sp2_diamond[n[0]] = line
+    sp2_sp1_diamond = {}
+    with open('Acanthochitona_rubrolineata.against.Acanthochitona_discrepans.diamond_blastp.m6.out') as file:
+        for line in file:
+            line = line.strip('\n')
+            n = line.strip('\n').split('\t')
+            if n[0] not in sp2_sp1_diamond.keys():
+                sp2_sp1_diamond[n[0]] = line
+            else:
+                if float(n[-1]) > float(sp2_sp1_diamond[n[0]].split('\t')[-1]):
+                    sp2_sp1_diamond[n[0]] = line
+    for i in set(sp1_sp2_diamond.keys()):
+        if sp1_sp2_diamond[i].split('\t')[1] in sp2_sp1_diamond.keys():
+            if i == sp2_sp1_diamond[sp1_sp2_diamond[i].split('\t')[1]].split('\t')[1]:
+                out.write(sp1_sp2_diamond[i]+'\n')
+
+#oxford plot in jcvi
+python -m jcvi.graphics.blastplot Acanthochitona_rubrolineata.Acanthochitona_discrepans.MBH.diamond.m6.out --sbed Acanthochitona_discrepans.bed --qbed Acanthochitona_rubrolineata.bed
+awk -v OFS='\t' '{print $1,$2}' Acanthochitona_rubrolineata.Acanthochitona_discrepans.MBH.diamond.m6.out > Acanthochitona_rubrolineata.Acanthochitona_discrepans.sp_MBH
+
+#Fisher exact test in R
+library(macrosyntR)
+library(ggplot2)
+my_orthologs <- load_orthologs(orthologs_table = "Acanthochitona_rubrolineata.Acanthochitona_discrepans.sp_MBH", sp1_bed="Acanthochitona_rubrolineata.bed", sp2_bed="Acanthochitona_discrepans.bed")
+my_macrosynteny <- compute_macrosynteny(my_orthologs,pvalue_threshold =0.001)
+p1 <- plot_macrosynteny(my_macrosynteny)
+ggsave(p1, width=8, height=8, file="Acanthochitona_rubrolineata.Acanthochitona_discrepans.macrosyntR.pdf")
+write.table(my_macrosynteny, sep="\t",col.names = NA, quote = FALSE, file = "Acanthochitona_rubrolineata.Acanthochitona_discrepans.macrosyntR.out")
