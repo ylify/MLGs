@@ -15,7 +15,7 @@ Generally, it is used to look into the chromosomal evolution in organisms. With 
 1) **Similarity search**: diamond blastp (suggested, or blastp in blast+) could be adopted to find the hits between them (MLGs as the query and proteins from genomes as databases). The protein was defined as a significant match against the mollusk ancestors if it was hit by at least 6 of 7 proteins from a linkage in MLGs (evalue < 0.001).  
 2) **Fisher’s exact test**: The linkage groups between MLGs and the specific genome are checked by Fisher’s exact test using R package macrosyntR (Sami El & Richard, 2023) with a significant threshold of p-value below 0.001.  
 3) **Visualization**: It needs your effort via Python or R. Personally, I would recommend Oxford-plot (https://bitbucket.org/viemet/public/src/master/CLG/).  
-Here is an example figure, shown below.  There is a event of whole genome duplication (WGD) in *Athatina fulica*.
+Here is an example figure, shown below.  There is a event of **whole genome duplication (WGD)** in *Athatina fulica*. The evolution from the mollusk ancestor might be via the early fusions (MLG09+MLG10+MLG14, MLG18+MLG20), the duplication (17 -> 34), and latter fusions (34 -> 31).  
 ![image](https://github.com/ylify/MLGs/blob/main/examples/figures/Mollusca_7sp.Acthatina_fulica.oxford_plot.jpg)
 
 
