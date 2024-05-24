@@ -5,5 +5,5 @@ In this version, seven genomes were employed in constructing the protein databas
 
 
 Reference:
-Simakov, O., Bredeson, J., Berkoff, K., Marletaz, F., Mitros, T., Schultz, D. T., . . . Rokhsar, D. S. (2022). Deeply conserved synteny and the evolution of metazoan chromosomes. Science Advances, 8(5), eabi5884. doi:doi:10.1126/sciadv.abi5884
-Muffato, M., Louis, A., Nguyen, N. T. T., Lucas, J., Berthelot, C., & Roest Crollius, H. (2023). Reconstruction of hundreds of reference ancestral genomes across the eukaryotic kingdom. Nature Ecology & Evolution, 7(3), 355-366. doi:10.1038/s41559-022-01956-z
+>Simakov, O., Bredeson, J., Berkoff, K., Marletaz, F., Mitros, T., Schultz, D. T., . . . Rokhsar, D. S. (2022). Deeply conserved synteny and the evolution of metazoan chromosomes. Science Advances, 8(5), eabi5884. doi:doi:10.1126/sciadv.abi5884
+>Muffato, M., Louis, A., Nguyen, N. T. T., Lucas, J., Berthelot, C., & Roest Crollius, H. (2023). Reconstruction of hundreds of reference ancestral genomes across the eukaryotic kingdom. Nature Ecology & Evolution, 7(3), 355-366. doi:10.1038/s41559-022-01956-z
