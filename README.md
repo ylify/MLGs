@@ -22,7 +22,8 @@ Here is an example figure, shown below.  There is a event of **whole genome dupl
 
 
 # Citation  
-If you adopt the database in research, please cite the below work. Thanks!  
+If you adopt the database in research, please cite the below work (revised in *elife*). Thanks!  
+Still waters run deep: Large scale genome rearrangements in the evolution of morphologically conservative Polyplacophora. http://biorxiv.org/content/early/2024/06/16/2024.06.13.598811.abstract
 
 # Reference  
 > **Buchfink**, B., Reuter, K., & Drost, H.-G. (2021). Sensitive protein alignments at tree-of-life scale using DIAMOND. Nature Methods, 18(4), 366-368. doi:10.1038/s41592-021-01101-x  
